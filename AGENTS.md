@@ -98,3 +98,9 @@ Extensão MV3 sem build: leitor de curso que o usuário aciona na página da pla
 `npm test` para regras de domínio/autenticação; `npm run build` para validar a aplicação; `npm run test:e2e` para fluxos de interface afetados (rode o build antes, porque o Playwright serve `dist/`). O script `test` lista os arquivos um a um em `package.json`: ao criar `*.test.js`, inclua-o lá, senão ele não roda no CI. Os e2e rodam com 1 worker (`fullyParallel: false`) porque compartilham o SQLite — não paralelize. A análise de link no e2e é interceptada por rota (simulação); extração real de plataformas não é exercitada. Mudanças apenas em documentação exigem revisão de coerência e links, sem repetir testes de código inalterado. Por decisão explícita da responsável, a interface não oferece modo essencial nem tratamento de movimento reduzido; os campos antigos permanecem apenas para compatibilidade dos dados.
 
 Na entrega, informe o que mudou, o que foi verificado e o que ainda não está implementado. Não chame um recurso de concluído com base apenas em sua aparência.
+
+## Cursor Cloud specific instructions
+
+- A imagem já traz Node 22.23.4+ (exigido por `node:sqlite`) e Google Chrome. `npm ci` na raiz prepara o site. O Playwright usa o Chrome instalado, salvo quando `PLAYWRIGHT_CHANNEL=bundled` (é o que o CI faz, e aí precisa de `npx playwright install chromium`).
+- `npm run dev` sobe o Astro na porta 4321 e a API em `127.0.0.1:4173`. Não há segredo obrigatório: Resend e `LUME_AI_API_KEY` são opcionais e, sem eles, o link de redefinição vai para o log e o organizador determinístico responde.
+- O aplicativo de desktop fica em `companion/` com lockfile próprio (`npm install --prefix companion`). Ele não entra no `npm ci` da raiz.
