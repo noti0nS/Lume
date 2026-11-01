@@ -21,6 +21,8 @@ body {
   margin: 0;
   padding: 18px;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -78,6 +80,8 @@ main {
   flex-direction: column;
   gap: 12px;
   flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .card {

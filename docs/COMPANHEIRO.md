@@ -66,6 +66,7 @@ implementado nem decidido. Ver [Importação](IMPORTACAO.md).
 | Quantas aulas faltam e em quais cursos | Implementado (`/api/companion/study`) |
 | Roteiro por prioridade | Implementado no servidor; exibido no comando `plan` e na janela |
 | Bandeja do sistema, janela principal com o site e painel de presença (Electron 45) | Implementado; abrir com `npm run companion:app` |
+| Rich Presence no Discord | Implementado no processo principal do Electron. Exige Application ID e a arte `lume_logo` no portal do Discord; sem o ID, fica inativo |
 | Instalador assinado | Pendente; a atualização pela janela já baixa e abre o instalador |
 
 A página Hoje do site usa o mesmo critério (`nextAction`, derivado de
@@ -167,6 +168,7 @@ O painel de presença mostra:
 | Roteiro | Aulas restantes, cursos ativos e as três próximas aulas com o motivo da prioridade |
 | Ações | Pausar/retomar presença, atualizar roteiro, abrir o Lume, desconectar |
 | Versão | Versão instalada, verificar atualização, baixar e abrir o instalador novo |
+| Discord | Curso e aula do roteiro no perfil do Discord, ligado por padrão, com interruptor no painel e na bandeja |
 | Pareamento | Código, nome do computador e endereço da API (avançado) |
 
 A bandeja tem ícones próprios para ativo, pausado e desconectado, menu com o
@@ -217,6 +219,9 @@ opt-in; pausa não é punida; nada de vigilância.
   local nem segunda conta: o que a pessoa vê no app é o mesmo Lume do navegador.
 - O painel de presença não tem acesso a Node nem ao token: fala com o processo
   principal por IPC com `contextIsolation` e `sandbox` ligados.
+- O Rich Presence fala só com o cliente do Discord no computador, a partir do
+  processo principal. O painel apenas liga ou desliga; não vê o token do
+  dispositivo nem o Application ID.
 - A janela principal também roda com `contextIsolation`, `sandbox` e sem Node;
   links externos vão para o navegador.
 - O token é criado no pareamento (código de 8 caracteres, uso único, 10 min).
@@ -289,7 +294,7 @@ Ou, sem janela: `npm run companion` (agente de terminal).
   na primeira execução.
 - Sem leitura de progresso automático das plataformas: a conclusão continua
   manual e identificada.
-- Sem integração com Discord: o Lume não lê a atividade de outros programas.
+- O status no Discord mostra o curso e a aula do roteiro (ou "Estudando no Lume"). O aplicativo não lê a atividade de outros programas. Sem Application ID configurado, o status fica oculto.
 - Sem presença de cursos abertos no navegador (depende da extensão, ainda não implementada).
 - Presença não vira tempo elegível de XP; a política exige validação no servidor.
 - Amigos, mensagens diretas e ranking de amigos existem no site; presença social e feed continuam pendentes; grupos, comunidades e canais estão fora do escopo desta etapa.

@@ -12,6 +12,7 @@ import {
   MAX_ALLOWLIST, cleanAppLabel, matchAllowlist, normalizeCategory,
   normalizeProcessName, parseTasklist,
 } from './domain.mjs';
+import { DISCORD_CLIENT_ID_PLACEHOLDER, discordFieldsFrom } from './discord-presence.mjs';
 
 const exec = promisify(execFile);
 
@@ -39,6 +40,9 @@ export function readConfig() {
     const initial = {
       apiUrl: DEFAULT_API, token: '', deviceName: '', intervalSeconds: 5,
       paused: false, allowlist: DEFAULT_ALLOWLIST,
+      discordPresence: true,
+      discordClientId: DISCORD_CLIENT_ID_PLACEHOLDER,
+      discordPublicUrl: '',
     };
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, `${JSON.stringify(initial, null, 2)}\n`, { mode: 0o600 });
@@ -53,6 +57,7 @@ export function readConfig() {
     intervalSeconds: Number.isFinite(value.intervalSeconds) && value.intervalSeconds >= 3 ? Math.min(value.intervalSeconds, 120) : 5,
     paused: value.paused === true,
     allowlist: Array.isArray(value.allowlist) ? value.allowlist.slice(0, MAX_ALLOWLIST) : DEFAULT_ALLOWLIST,
+    ...discordFieldsFrom(value),
   };
 }
 
@@ -65,6 +70,12 @@ export function saveConfig(config) {
 export function setPaused(paused) {
   const config = readConfig();
   saveConfig({ ...config, paused: paused === true });
+  return readConfig();
+}
+
+export function setDiscordPresence(enabled) {
+  const config = readConfig();
+  saveConfig({ ...config, discordPresence: enabled === true });
   return readConfig();
 }
 

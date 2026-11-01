@@ -16,7 +16,7 @@ continua disponível para diagnóstico.
 - Fecha para a bandeja em vez de encerrar; a bandeja mostra estado, próxima aula
   e o atalho para sair.
 - Painel de presença (400×640): dispositivo, aplicativo detectado, roteiro por
-  prioridade, pausa, pareamento, versão e atualização.
+  prioridade, pausa, pareamento, versão, atualização e o interruptor do Discord.
 - Lê a lista de processos do Windows com `tasklist` e compara com a **allowlist**
   que você escolhe: processo → nome exibido → categoria
   (`study`, `project`, `reading`, `break`, `game`, `other`).
@@ -102,6 +102,9 @@ Fica em `%APPDATA%\Lume\companion.json` (fora do repositório):
   "deviceName": "PC da Ana",
   "intervalSeconds": 5,
   "paused": false,
+  "discordPresence": true,
+  "discordClientId": "COLOQUE_O_APPLICATION_ID",
+  "discordPublicUrl": "",
   "allowlist": [
     { "process": "anki", "label": "Anki", "category": "study" },
     { "process": "code", "label": "VS Code", "category": "project" }
@@ -113,6 +116,55 @@ O token é o acesso deste computador. Ele só pode **relatar presença** e ler o
 roteiro — não lê o estado da conta, não altera cursos e não recebe XP. Para
 revogar, use **Desconectar** no painel do Lume; o token deixa de valer
 imediatamente.
+
+`discordPresence` liga o status no Discord (padrão: ligado). `discordClientId`
+e `discordPublicUrl` estão descritos na seção Discord.
+
+## Discord
+
+O aplicativo pode mostrar no Discord o curso e a aula atuais do roteiro. O site
+não faz isso: o Rich Presence só existe num programa local, falando com o
+cliente do Discord pelo canal IPC. A função fica no processo principal do
+Electron.
+
+- Ligado por padrão. No painel, **Ocultar do Discord** desliga; a escolha fica
+  em `discordPresence`. A bandeja tem o mesmo interruptor.
+- Com roteiro, a linha de detalhes é o nome do curso e o estado é o nome da
+  aula. Sem roteiro, o texto é "Estudando no Lume".
+- A imagem grande usa a chave de arte `lume_logo`. O tempo decorrido começa
+  quando a atividade atual começa (o aplicativo autorizado, se houver, ou o
+  momento em que aquele curso e aquela aula passaram a ser o status).
+- Um botão, **Abrir o Lume**, aponta para o site público. No seu próprio perfil
+  o Discord não mostra os botões; outras pessoas veem.
+
+### Criar o aplicativo no Discord
+
+1. Abra o [Portal do desenvolvedor](https://discord.com/developers/applications)
+   e crie um aplicativo (por exemplo, "Lume").
+2. Copie o **Application ID**.
+3. Em **Rich Presence → Art Assets**, envie o logo do Lume com o nome
+   **`lume_logo`** (minúsculas, sem espaço).
+4. Coloque o ID em `%APPDATA%\Lume\companion.json`, no lugar de
+   `COLOQUE_O_APPLICATION_ID`:
+
+```json
+"discordClientId": "123456789012345678"
+```
+
+A variável de ambiente `LUME_DISCORD_CLIENT_ID` também serve e tem prioridade
+sobre o arquivo. Enquanto o valor estiver vazio ou for o marcador
+`COLOQUE_O_APPLICATION_ID`, o aplicativo não conecta, não quebra e não repete
+erro no log.
+
+O botão usa `discordPublicUrl` ou a variável `LUME_DISCORD_PUBLIC_URL`, desde
+que seja `https`. Sem isso, o endereço é
+`https://lume.lume-prototype.workers.dev`.
+
+Se o Discord estiver fechado ou a conexão cair, o status some junto com a
+conexão e o Lume tenta de novo em silêncio, com espera crescente (5s, 10s,
+20s…, no máximo 5 min). O status só é reenviado quando o texto muda, no máximo
+uma vez a cada 15 segundos. A atividade também é removida ao ocultar o status
+e ao sair do aplicativo.
 
 ## Segurança e privacidade
 
@@ -131,4 +183,5 @@ imediatamente.
 - Só Windows x64; sem suporte a Linux/macOS.
 - Sem leitura de progresso automático das plataformas: a conclusão continua
   manual e identificada.
-- Sem integração com Discord; o Lume não lê a atividade de outros programas.
+- O status no Discord mostra curso e aula do roteiro; o Lume não lê a
+  atividade de outros programas nem o que a pessoa faz dentro do Discord.

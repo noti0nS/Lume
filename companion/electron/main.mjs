@@ -9,8 +9,10 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  DEFAULT_API, createCompanion, pairDevice, readConfig, setPaused, unpairDevice,
+  DEFAULT_API, createCompanion, pairDevice, readConfig, setDiscordPresence, setPaused, unpairDevice,
 } from '../core.mjs';
+import { createIpcDiscordClient } from '../discord-client.mjs';
+import { createDiscordPresence, resolveDiscordSettings } from '../discord-presence.mjs';
 import { checkForUpdate, downloadInstaller, RELEASES_PAGE } from '../update.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -22,11 +24,13 @@ let tray = null;
 let mainWindow = null;
 let panelWindow = null;
 let companion = null;
+let discord = null;
 let quitting = false;
 let state = {
   running: false, paused: false, paired: false, deviceName: '', apiUrl: '',
   detected: null, since: null, plan: null, error: null,
 };
+let discordStatus = { enabled: true, configured: false, status: 'unconfigured' };
 let updateInfo = {
   status: 'idle', currentVersion: '', latest: null, progress: 0, error: null, file: null, page: RELEASES_PAGE,
 };
@@ -43,9 +47,22 @@ if (!app.requestSingleInstanceLock()) {
       onUpdate: (value) => {
         state = value;
         broadcast();
+        if (discord) discord.sync(state).catch(() => {});
       },
     });
     state = companion.getState();
+    if (!smoke) {
+      discord = createDiscordPresence({
+        createClient: (clientId) => createIpcDiscordClient(clientId),
+        readSettings: () => resolveDiscordSettings(readConfig(), process.env),
+        log: (message) => console.info(message),
+        onStatus: (value) => {
+          discordStatus = value;
+          broadcast();
+        },
+      });
+    }
+    discordStatus = discordGuess();
 
     tray = new Tray(trayImage(state));
     tray.on('click', () => showMain());
@@ -83,6 +100,7 @@ if (!app.requestSingleInstanceLock()) {
     createMainWindow();
     mainWindow.once('ready-to-show', () => mainWindow.show());
     if (state.paired) await companion.start();
+    else if (discord) await discord.sync(state);
   }).catch((error) => {
     console.error(`companion:startup-failed ${error?.stack || error}`);
     if (smoke) {
@@ -103,6 +121,7 @@ app.on('before-quit', async (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
+  try { await discord?.stop(); } catch { /* sair mesmo assim. */ }
   try { await companion?.stop(); } catch { /* sair mesmo assim. */ }
   app.quit();
 });
@@ -145,7 +164,12 @@ function buildMenu() {
     const next = state.plan.steps?.[0];
     if (next) items.push({ label: `Próxima: ${truncate(next.title, 42)}`, enabled: false, click: () => showMain() });
   }
-  items.push({ type: 'separator' }, { label: 'Sair', click: () => app.quit() });
+  items.push({ type: 'separator' });
+  items.push({
+    label: discordStatus.enabled ? 'Ocultar do Discord' : 'Mostrar no Discord',
+    click: () => { toggleDiscord().catch(() => {}); },
+  });
+  items.push({ label: 'Sair', click: () => app.quit() });
   tray.setContextMenu(Menu.buildFromTemplate(items));
   tray.setToolTip(trayLabel(state));
 }
@@ -155,8 +179,17 @@ function truncate(value, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function discordGuess() {
+  const settings = resolveDiscordSettings(readConfig(), process.env);
+  return {
+    enabled: settings.enabled,
+    configured: settings.configured,
+    status: !settings.enabled ? 'off' : settings.configured ? 'connecting' : 'unconfigured',
+  };
+}
+
 function snapshot() {
-  return { ...state, update: { ...updateInfo, currentVersion: app.getVersion() } };
+  return { ...state, discord: discordStatus, update: { ...updateInfo, currentVersion: app.getVersion() } };
 }
 
 function broadcast() {
@@ -317,6 +350,15 @@ function showPanel() {
   panelWindow.focus();
 }
 
+async function toggleDiscord() {
+  const enabled = readConfig().discordPresence !== false;
+  setDiscordPresence(!enabled);
+  if (discord) await discord.sync(companion?.getState() || state);
+  else discordStatus = discordGuess();
+  broadcast();
+  return snapshot();
+}
+
 async function togglePause() {
   const next = !readConfig().paused;
   setPaused(next);
@@ -374,6 +416,8 @@ ipcMain.handle('action', async (_event, name, payload = {}) => {
     }
     case 'toggle-pause':
       return togglePause();
+    case 'toggle-discord':
+      return toggleDiscord();
     case 'unpair':
       return disconnect();
     case 'refresh':

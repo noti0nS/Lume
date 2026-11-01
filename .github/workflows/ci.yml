@@ -75,7 +75,10 @@ jobs:
             "companion/electron/main.mjs",
             "companion/electron/preload.cjs",
             "companion/electron/renderer/app.js",
-            "companion/domain.mjs"
+            "companion/domain.mjs",
+            "companion/discord-presence.mjs",
+            "companion/discord-client.mjs",
+            "companion/update.mjs"
           )
           foreach ($file in $files) {
             node --check $file

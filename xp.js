@@ -200,7 +200,7 @@ async function achievementForBonus(db, userId, event, course) {
   }
 }
 
-export async function xpSummary(db, userId, settings = null) {
+export async function xpSummary(db, userId, settings = null, now = Date.now()) {
   const config = settings || await readSettings(db, userId);
   if (!config) {
     return {
@@ -227,7 +227,9 @@ export async function xpSummary(db, userId, settings = null) {
        FROM xp_events WHERE user_id = ?`,
     [userId],
   );
-  const day = localDay(config.time_zone);
+  // O dia segue o relógio já aceito por getXpSnapshot. Sem isso, o teto diário
+  // lia o calendário da máquina e o teste de 31/10 falhava em qualquer outro dia.
+  const day = localDay(config.time_zone, new Date(now));
   const today = await db.first(
     `SELECT COALESCE(SUM(xp), 0) AS xp FROM xp_events
       WHERE user_id = ? AND kind = 'time_block' AND local_day = ?`,
@@ -261,7 +263,7 @@ export async function getXpSnapshot(db, userId, { now = Date.now(), timeZone = '
   if (!settings) {
     return {
       policy: xpPolicy(),
-      summary: await xpSummary(db, userId, null),
+      summary: await xpSummary(db, userId, null, now),
       settings: null,
       events: [],
       achievements: [],
@@ -277,7 +279,7 @@ export async function getXpSnapshot(db, userId, { now = Date.now(), timeZone = '
   );
   return {
     policy: xpPolicy(),
-    summary: await xpSummary(db, userId, settings),
+    summary: await xpSummary(db, userId, settings, now),
     settings: serializeSettings(settings),
     events: events.map(serializeEvent),
     achievements: achievements.map(serializeAchievement),
@@ -508,7 +510,7 @@ export async function recordTimeSession(db, userId, input, { now = Date.now() } 
       grantedXP: Number(row.granted_xp),
       effectiveSeconds: Number(row.effective_seconds),
       carrySeconds: Number(config?.consumed_seconds || 0) % TIME_BLOCK_SECONDS,
-      dailyTimeXP: (await xpSummary(db, userId, config)).dailyTimeXP,
+      dailyTimeXP: (await xpSummary(db, userId, config, now)).dailyTimeXP,
       discardedBlocks: 0,
     };
   }

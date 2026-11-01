@@ -251,7 +251,10 @@ contrário do que Produto §7 pede.
 ## 8. Aplicativo de desktop
 
 **Parcial.** Janela com o site completo, bandeja, presença local por allowlist, roteiro e atualização por
-clique. Falta: instalador assinado; início com o Windows; notificações; abrir a próxima aula pelo painel;
+clique. O processo principal publica Rich Presence no Discord (curso e aula do roteiro, botão para o site,
+ligado por padrão). Falta a responsável criar o aplicativo no Developer Portal, informar o Application ID
+(`LUME_DISCORD_CLIENT_ID` ou `discordClientId`) e enviar a arte `lume_logo`; sem o ID o status fica oculto.
+Falta também: instalador assinado; início com o Windows; notificações; abrir a próxima aula pelo painel;
 funcionamento sem rede; suporte a Linux e macOS; janela e bandeja testadas no CI. A versão local é 0.5.1 e a
 última release publicada é `companion-v0.5.0`.
 

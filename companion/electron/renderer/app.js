@@ -90,6 +90,22 @@ function renderError(message) {
   node.classList.toggle('hidden', !message);
 }
 
+function discordLine(discord) {
+  if (!discord.enabled || discord.status === 'off') return 'Status oculto neste computador.';
+  if (!discord.configured || discord.status === 'unconfigured') return 'Informe o Application ID para publicar o status.';
+  if (discord.status === 'connected') return 'Curso e aula atuais visíveis no Discord.';
+  if (discord.status === 'retrying') return 'Aguardando o Discord neste computador.';
+  return 'Conectando ao Discord…';
+}
+
+function renderDiscord() {
+  const discord = state.discord || { enabled: true, configured: false, status: 'unconfigured' };
+  const button = $('discord-toggle');
+  button.textContent = discord.enabled ? 'Ocultar do Discord' : 'Mostrar no Discord';
+  button.setAttribute('aria-pressed', discord.enabled ? 'true' : 'false');
+  $('discord-line').textContent = discordLine(discord);
+}
+
 function renderUpdate() {
   const info = state.update || {};
   const status = info.status || 'idle';
@@ -141,6 +157,7 @@ function render() {
   show('unpair', state.paired);
   if (state.paired) renderPresence();
   renderPlan();
+  renderDiscord();
   renderError(state.error);
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
   renderUpdate();
@@ -179,6 +196,7 @@ $('pair-form').addEventListener('submit', (event) => {
 });
 
 $('pause').addEventListener('click', () => run('toggle-pause'));
+$('discord-toggle').addEventListener('click', () => run('toggle-discord'));
 $('refresh').addEventListener('click', () => run('refresh'));
 $('open-settings').addEventListener('click', () => run('open-settings'));
 $('unpair').addEventListener('click', () => {

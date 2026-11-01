@@ -8,11 +8,15 @@ directories:
 
 # Só o necessário para a janela e a bandeja. O agente de terminal (agent.mjs)
 # não vai no pacote: quem usa o app não precisa dele.
+# @xhayper/discord-rpc fica em dependencies: o electron-builder copia as
+# dependências de produção para o pacote mesmo com esta lista restrita.
 files:
   - electron/**/*
   - core.mjs
   - domain.mjs
   - update.mjs
+  - discord-presence.mjs
+  - discord-client.mjs
   - package.json
 
 # Ícones fora do asar, para o nativeImage ler caminho real.
