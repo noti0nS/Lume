@@ -139,6 +139,7 @@ Electron.
 - Quando o curso tem total conhecido, o Discord mostra o contador "(12 de 40)"
   ao lado da aula: aulas já concluídas + 1, sobre o total do curso. É uma
   referência de avanço, não prova de estudo.
+- Com a janela do Lume aberta, o status acompanha o que você estuda: aula aberta ("Estudando Falência" / "Aula 9 · título"), PDF aberto ("Lendo …" / "Página 12 de 300") e sessão de foco ("Em foco · curso", com o relógio da sessão; em pausa mostra "12 min focados"). A página envia só esses nomes, a cada 20 s; se parar de enviar (janela fechada, página travada), o status volta ao roteiro. Abrir a tela não conta como estudo: sem aula, PDF ou foco abertos, vale o roteiro. Não gera XP.
 - **Pausar a presença** troca o status para "Em pausa", sem relógio, curso ou
   contador; ao retomar, o relógio recomeça.
 - A imagem grande usa a chave de arte `lume_logo`. O tempo decorrido começa
@@ -153,7 +154,11 @@ Electron.
    e crie um aplicativo (por exemplo, "Lume").
 2. Copie o **Application ID**.
 3. Em **Rich Presence → Art Assets**, envie o logo do Lume com o nome
-   **`lume_logo`** (minúsculas, sem espaço).
+   **`lume_logo`** (minúsculas, sem espaço). O arquivo com a estrela dourada da
+   identidade Norte (1024×1024) está em `companion/assets/discord-lume_logo.png`,
+   gerado de `public/favicon.svg`. Para trocar a imagem já enviada, apague o
+   asset antigo, envie este com o mesmo nome e salve; o Discord pode levar
+   alguns minutos (ou reiniciar o cliente) para parar de mostrar a versão em cache.
 4. O Application ID do Lume já vem no build (`DEFAULT_DISCORD_CLIENT_ID` em
    `discord-presence.mjs`); não é segredo. Para usar outro aplicativo, coloque o
    ID em `%APPDATA%\Lume\companion.json`, no lugar de `COLOQUE_O_APPLICATION_ID`:

@@ -4,6 +4,7 @@
 // estado real; sem dados, ficam os estados vazios.
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { studyRhythm, hasPreparation } from '../../../public/domain.js';
 import { materialLesson } from '../../../public/material-model.js';
 import { nextAction } from '../../../public/study-plan.js';
@@ -255,11 +256,11 @@ export function Home({ state, open, go, planActions, notify, account }) {
         </section>
       </div>
 
-      <aside className="today-side" aria-label="Semana e amigos">
+      <aside className="today-side" aria-label="Semana">
         <WeekLights state={state} today={today}/>
-        <FriendsCard account={account} go={go}/>
       </aside>
     </div>
+    <ActiveRail account={account} go={go}/>
   </div>;
 }
 
@@ -314,64 +315,77 @@ function WeekLights({ state }) {
   </section>;
 }
 
-// Amigos ativos agora (sessão de foco aberta, Companion ou presença recente), com atalhos para chat, amigos e ranking.
-function FriendsCard({ account, go }) {
+// Barra lateral "Ativos agora": amigos com presença recente (sessão de foco aberta,
+// aplicativo de desktop ou site aberto) e a matéria que estudam, quando compartilham.
+// Em telas largas fica fixa na borda direita, em altura total, abaixo do cabeçalho;
+// em telas estreitas vira uma seção comum no fim da página.
+const RAIL_QUERY = '(min-width: 1200px)';
+
+function useWideRail() {
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(RAIL_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(RAIL_QUERY);
+    const update = () => setWide(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return wide;
+}
+
+function ActiveRail({ account, go }) {
+  const wide = useWideRail();
   const resource = useResource('/api/friends', { interval: 45000, enabled: Boolean(account) });
   const friends = resource.data?.friends || [];
   const activeFriends = friends
     .filter((friend) => friend.activity?.active)
     .sort((a, b) => Number(b.activity?.status === 'studying') - Number(a.activity?.status === 'studying') || a.name.localeCompare(b.name, 'pt-BR'));
-  const studying = activeFriends.filter((friend) => friend.activity?.status === 'studying').length;
-  const [openList, setOpenList] = useState(true);
 
-  return <section className={`card-surface today-friends ${openList ? '' : 'is-collapsed'}`} aria-labelledby="today-friends-title">
-    <div className="today-card-head">
-      <h2 id="today-friends-title" className="title">Amigos</h2>
-      <span className="today-friends-tools">
-        {studying > 0 && <span className="today-friends-count">{studying} estudando agora</span>}
-        <button
-          type="button"
-          className="today-collapse-btn"
-          aria-expanded={openList}
-          aria-label={openList ? 'Recolher lista de amigos ativos' : 'Expandir lista de amigos ativos'}
-          onClick={() => setOpenList((value) => !value)}
-        >
-          <Icon name={openList ? 'chevron-up' : 'chevron-down'}/>
-        </button>
-      </span>
-    </div>
+  useEffect(() => {
+    if (!wide) return undefined;
+    document.documentElement.classList.add('has-active-rail');
+    return () => document.documentElement.classList.remove('has-active-rail');
+  }, [wide]);
 
-    {openList && (
-      !account
-        ? <p className="muted-text today-friends-empty">Amigos, mensagens e ranking ficam disponíveis com uma conta.</p>
-        : !resource.data
-          ? <Skeleton label="Carregando amigos…" rows={2}/>
-          : activeFriends.length
-            ? <ul className="today-friend-list">{activeFriends.slice(0, 5).map((friend) => {
-              const activity = friend.activity || { label: 'Online', topic: '' };
-              return <li key={friend.id} className="today-friend-item">
-                <a className="today-friend-link" {...warmProfileProps(friend)} href={`#perfil?id=${encodeURIComponent(friend.id)}`} onClick={friend.handle ? (event) => { event.preventDefault(); go(`perfil?u=${friend.handle}`); } : undefined}>
-                  <span className="avatar today-friend-avatar" aria-hidden="true">{String(friend.name || '?').slice(0, 1).toUpperCase()}</span>
-                  <span className="friend-copy">
+  const rail = <aside className="active-rail" aria-labelledby="active-rail-title">
+    <h2 id="active-rail-title" className="active-rail-title">Ativos agora</h2>
+    {!account
+      ? <p className="muted-text active-rail-empty">Amigos, mensagens e ranking ficam disponíveis com uma conta.</p>
+      : !resource.data
+        ? <Skeleton label="Carregando amigos…" rows={2}/>
+        : activeFriends.length
+          ? <ul className="active-rail-list">{activeFriends.map((friend) => {
+            const activity = friend.activity || { status: 'online', label: 'Online', topic: '' };
+            const studying = activity.status === 'studying';
+            return <li key={friend.id} className={`active-card ${studying ? 'is-studying' : ''}`}>
+              <div className="active-card-head">
+                <a className="active-card-who" {...warmProfileProps(friend)} href={`#perfil?id=${encodeURIComponent(friend.id)}`} onClick={friend.handle ? (event) => { event.preventDefault(); go(`perfil?u=${friend.handle}`); } : undefined}>
+                  <span className="avatar active-avatar" aria-hidden="true">
+                    {String(friend.name || '?').slice(0, 1).toUpperCase()}
+                    <span className="active-presence" />
+                  </span>
+                  <span className="active-copy">
                     <strong>{friend.name}</strong>
-                    <span className="friend-status">{activity.label}{activity.topic ? ` · ${activity.topic}` : ''}</span>
+                    <span className="active-status">{activity.label}</span>
                   </span>
                 </a>
-                <a className="today-friend-msg" href={`#mensagens?com=${encodeURIComponent(friend.id)}`} aria-label={`Mensagem para ${friend.name}`} title={`Mensagem para ${friend.name}`}>
+                <a className="active-msg" href={`#mensagens?com=${encodeURIComponent(friend.id)}`} aria-label={`Mensagem para ${friend.name}`} title={`Mensagem para ${friend.name}`}>
                   <Icon name="message"/>
                 </a>
-              </li>;
-            })}</ul>
-            : friends.length
-              ? <p className="muted-text today-friends-empty">Nenhum amigo ativo agora.</p>
-              : <p className="muted-text today-friends-empty">Estudar junto é opcional. Um convite começa a lista.</p>
-    )}
+              </div>
+              {studying && <div className="active-card-body">
+                <span className="active-tile" aria-hidden="true"><Icon name="book"/></span>
+                <span className="active-copy">
+                  <strong>{activity.topic || 'Sessão de estudo'}</strong>
+                  <span className="active-status">estudando agora</span>
+                </span>
+              </div>}
+            </li>;
+          })}</ul>
+          : <p className="muted-text active-rail-empty">{friends.length ? 'Nenhum amigo ativo agora.' : 'Estudar junto é opcional. Um convite começa a lista.'}</p>}
+  </aside>;
 
-    <div className="today-side-links">
-      <a className="text-link" href="#amigos">Ver amigos</a>
-      <a className="text-link" href="#ranking">Ranking</a>
-    </div>
-  </section>;
+  return wide ? createPortal(rail, document.body) : rail;
 }
 
 function taskMeta(task) {

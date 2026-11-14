@@ -21,6 +21,7 @@ export const RETRY_MAX_MS = 5 * 60_000;
 export const DISCORD_TEXT_MAX = 128;
 const BUTTON_LABEL_MAX = 32;
 const URL_MAX = 512;
+const FOCUS_DRIFT_MS = 5_000;
 
 export function clipDiscordText(value, max = DISCORD_TEXT_MAX) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -132,8 +133,95 @@ export function buildPausedActivity({ publicUrl, assetKey = DISCORD_ASSET_KEY } 
   return { activity, identity: 'paused' };
 }
 
-export function buildDiscordActivity({ plan, startedAt, publicUrl, assetKey = DISCORD_ASSET_KEY, paused = false } = {}) {
+// Atividade enviada pela janela do Lume (aula ou PDF aberto, sessão de foco).
+// Entrada não confiável: tudo é recortado e conferido aqui.
+export function normalizeStudy(value) {
+  if (!value || typeof value !== 'object') return null;
+  const kind = ['lesson', 'pdf', 'focus'].includes(value.kind) ? value.kind : '';
+  if (!kind) return null;
+  const int = (n) => (Number.isInteger(n) && n > 0 && n < 1_000_000 ? n : 0);
+  const study = {
+    kind,
+    course: clipDiscordText(value.course),
+    lesson: clipDiscordText(value.lesson),
+    number: int(value.number),
+    total: int(value.total),
+    page: int(value.page),
+    pages: int(value.pages),
+    focus: null,
+  };
+  const focus = value.focus;
+  if (focus && typeof focus === 'object') {
+    const elapsed = Number(focus.elapsedMs);
+    study.focus = {
+      label: clipDiscordText(focus.label),
+      paused: focus.paused === true,
+      elapsedMs: Number.isFinite(elapsed) && elapsed >= 0 ? Math.min(Math.round(elapsed), 7 * 86_400_000) : 0,
+    };
+  }
+  if (kind === 'focus' && !study.focus) return null;
+  return study;
+}
+
+export function studyIdentity(study) {
+  if (!study) return '';
+  if (study.focus) return `focus\n${study.course}\n${study.focus.label}`;
+  return `${study.kind}\n${study.course}\n${study.lesson}`;
+}
+
+function materialLine(study) {
+  if (study.kind === 'pdf') {
+    return study.pages ? `Página ${study.page || 1} de ${study.pages}` : `Página ${study.page || 1}`;
+  }
+  if (study.kind === 'lesson') {
+    const aula = study.number ? `Aula ${study.number}` : '';
+    return [aula, study.lesson].filter(Boolean).join(' · ');
+  }
+  return '';
+}
+
+export function formatFocusMinutes(ms) {
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  if (minutes < 1) return 'menos de 1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
+// Status do que está sendo estudado: "Estudando Falência" / "Aula 9 · Título",
+// "Lendo Apostila" / "Página 12 de 300", "Em foco · Curso" com o relógio da sessão.
+export function buildStudyActivity({ study, startedAt, publicUrl, assetKey = DISCORD_ASSET_KEY } = {}) {
+  const activity = {
+    largeImageKey: assetKey,
+    largeImageText: DISCORD_LARGE_IMAGE_TEXT,
+    instance: false,
+  };
+  const subject = study.course || study.focus?.label || '';
+  const line = materialLine(study);
+  if (study.focus?.paused) {
+    activity.details = clipDiscordText(`Foco em pausa${subject ? ` · ${subject}` : ''}`);
+    activity.state = clipDiscordText(`${formatFocusMinutes(study.focus.elapsedMs)} focados`);
+  } else if (study.focus) {
+    activity.details = clipDiscordText(`Em foco${subject ? ` · ${subject}` : ''}`) || 'Em foco';
+    activity.state = clipDiscordText(line) || clipDiscordText(study.focus.label) || 'Sessão de foco';
+  } else {
+    const verb = study.kind === 'pdf' ? 'Lendo' : 'Estudando';
+    activity.details = clipDiscordText(`${verb} ${subject}`) || DISCORD_FALLBACK_DETAILS;
+    const text = clipDiscordText(line);
+    if (text) activity.state = text;
+  }
+  const start = study.focus?.paused ? 0 : toTimestamp(startedAt);
+  if (start) activity.startTimestamp = start;
+  const url = normalizeHttpUrl(publicUrl);
+  const label = clipDiscordText(DISCORD_BUTTON_LABEL, BUTTON_LABEL_MAX);
+  if (url && label) activity.buttons = [{ label, url }];
+  return { activity, identity: studyIdentity(study) };
+}
+
+export function buildDiscordActivity({ plan, startedAt, publicUrl, assetKey = DISCORD_ASSET_KEY, paused = false, study = null } = {}) {
   if (paused) return buildPausedActivity({ publicUrl, assetKey });
+  if (study) return buildStudyActivity({ study, startedAt, publicUrl, assetKey });
   const lesson = currentLesson(plan);
   const details = lesson?.course || DISCORD_FALLBACK_DETAILS;
   const state = lesson?.lesson && lesson.lesson !== details ? lesson.lesson : '';
@@ -358,21 +446,37 @@ export function createDiscordPresence({
     return startedAt;
   }
 
+  // Relógio da sessão de foco: início = agora − tempo decorrido. Diferenças
+  // pequenas entre envios (menos de 5 s) mantêm o início anterior, para o status
+  // não ser reenviado a cada batimento.
+  function focusStart(identity, focus, nowMs) {
+    const start = nowMs - focus.elapsedMs;
+    if (clock && clock.identity === identity && clock.startedAt && Math.abs(clock.startedAt - start) < FOCUS_DRIFT_MS) return clock.startedAt;
+    clock = { identity, startedAt: start, sessionStartedAt: '' };
+    return start;
+  }
+
   function compute(companionState, settings) {
     const sessionStartedAt = companionState?.since || '';
     const paused = companionState?.paused === true;
+    const study = normalizeStudy(companionState?.study);
     const draft = buildDiscordActivity({
       plan: companionState?.plan,
       publicUrl: settings.publicUrl,
       assetKey: settings.assetKey,
       paused,
+      study,
     });
     // Pausar zera o relógio: ao voltar, a contagem recomeça em vez de somar a pausa.
     if (paused) clock = null;
-    const startedAt = paused ? 0 : rememberClock(draft.identity, sessionStartedAt);
+    let startedAt;
+    if (paused || study?.focus?.paused) startedAt = 0;
+    else if (study?.focus) startedAt = focusStart(draft.identity, study.focus, now());
+    else startedAt = rememberClock(draft.identity, study ? '' : sessionStartedAt);
     const built = buildDiscordActivity({
       plan: companionState?.plan,
       paused,
+      study,
       startedAt,
       publicUrl: settings.publicUrl,
       assetKey: settings.assetKey,

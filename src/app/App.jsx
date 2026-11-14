@@ -6,7 +6,8 @@ import { Dialog, PageSkeleton, enter, ease } from '../ui/ui.jsx';
 import { ENTRY_ROUTES, PUBLIC_ROUTES, ROUTE_BY_ID, SessionCheck, parseHash, routeHash } from './routes.jsx';
 import { ModalContent } from './modals.jsx';
 import Icon from '../ui/Icon.jsx';
-import { markDesktop, syncTitleBar } from '../lib/desktop.js';
+import { isDesktopApp, markDesktop, reportStudy, syncTitleBar } from '../lib/desktop.js';
+import { studyActivity } from '../../public/presence-domain.js';
 import { listenForExtension } from '../lib/extension.js';
 import { findLessonByUrl } from '../../public/import-domain.js';
 import Reminders from '../features/agenda/Reminders.jsx';
@@ -109,6 +110,18 @@ export default function App() {
     }
     previousRoute.current = route;
   }, [route, state.preferences.theme, state.preferences.textSize]);
+  // Status do Discord no aplicativo: aula ou PDF aberto e sessão de foco. A página
+  // renova a cada 20 s; se ela parar, o aplicativo volta ao roteiro sozinho.
+  const modalRef = useRef(null);
+  modalRef.current = modal;
+  useEffect(() => {
+    if (!isDesktopApp()) return undefined;
+    const send = () => reportStudy(studyActivity(stateRef.current, { modal: modalRef.current }));
+    send();
+    const beat = setInterval(send, 20000);
+    return () => clearInterval(beat);
+  }, [modal, state.activeSession, state.courses]);
+  useEffect(() => () => reportStudy(null), []);
   const open = useCallback(value => setModal(value), []);
   const close = useCallback(() => setModal(null), []);
   async function exit() {

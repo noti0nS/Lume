@@ -1,6 +1,19 @@
 // GERADO por scripts/build-news.mjs a partir de commits com "Novidade:". Não edite.
 export const GENERATED_NEWS = [
   {
+    "id": "news-17ea328e",
+    "at": "2026-11-14T19:59:26.000Z",
+    "title": "Discord mostra o que você estuda",
+    "body": "O status do Discord agora mostra a aula (ex.: Falência, aula 9), o PDF que você lê e a sessão de foco com o tempo focado.",
+    "href": "#aplicativo",
+    "area": "desktop",
+    "details": [
+      "Aula aberta aparece como \"Estudando curso\" com o número da aula.",
+      "PDF aberto mostra a página atual.",
+      "A sessão de foco mostra o relógio e, em pausa, os minutos focados."
+    ]
+  },
+  {
     "id": "news-9594ebf2",
     "at": "2026-11-14T18:57:10.000Z",
     "title": "Adicionar amigo pelo perfil",
