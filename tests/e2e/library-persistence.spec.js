@@ -44,7 +44,7 @@ test('prévia não carrega dados antigos nem persiste alterações após recarga
   await expect(page.getByText('Somente na prévia', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('lume.prototype.v1'))).toBeNull();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Bem-vindo de volta ao Lume.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Entre no Lume' })).toBeVisible();
   await expect(page.getByText('Somente na prévia', { exact: true })).toHaveCount(0);
 });
 

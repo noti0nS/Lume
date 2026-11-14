@@ -103,7 +103,7 @@ test('prévia, dados legados, busca, filtros, teclado, curso e progresso', { tag
 test('cadastro, saída, login, sincronização e recuperação na API local', async ({ page }, testInfo) => {
   const email = `react-${testInfo.project.name}-${crypto.randomUUID()}@example.test`;
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Bem-vindo de volta ao Lume.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Entre no Lume' })).toBeVisible();
   await expect(page.locator('#main > div')).toHaveCSS('opacity', '1');
   await page.getByRole('button', { name: 'Criar conta', exact: true }).first().click();
   await page.getByLabel('Seu nome', { exact: true }).fill('Pessoa de teste');
@@ -112,7 +112,7 @@ test('cadastro, saída, login, sincronização e recuperação na API local', as
   await page.getByLabel('Senha', { exact: true }).fill('senha-local-teste-123');
   await page.getByRole('button', { name: 'Mostrar senha' }).click();
   await expect(page.getByLabel('Senha', { exact: true })).toHaveAttribute('type', 'text');
-  await page.getByRole('button', { name: 'Criar minha conta' }).click();
+  await page.locator('#auth-form').getByRole('button', { name: 'Criar conta', exact: true }).click();
   await page.getByRole('button', { name: 'Explorar sem personalizar agora' }).click();
   await expect(page.getByRole('heading', { name: 'Início', exact: true })).toBeVisible();
   await expect(page.locator('#main > div')).toHaveCSS('opacity', '1');
@@ -126,10 +126,10 @@ test('cadastro, saída, login, sincronização e recuperação na API local', as
   await page.getByRole('button', { name: 'Voltar à biblioteca' }).click();
   await page.getByRole('button', { name: /^Menu da conta/ }).click();
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Bem-vindo de volta ao Lume.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Entre no Lume' })).toBeVisible();
   await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill('senha-local-teste-123');
-  await page.getByRole('button', { name: 'Entrar e ir além' }).click();
+  await page.locator('#auth-form').getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Início', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Biblioteca', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Curso da minha conta,/ })).toBeVisible();

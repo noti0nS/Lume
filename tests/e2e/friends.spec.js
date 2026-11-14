@@ -11,7 +11,7 @@ async function register(page, testInfo, prefix, name = 'Pessoa de teste') {
   await page.getByLabel('Seu @usuário').fill('u' + crypto.randomUUID().replace(/-/g, '').slice(0, 14));
   await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill('senha-local-teste-123');
-  await page.getByRole('button', { name: 'Criar minha conta' }).click();
+  await page.locator('#auth-form').getByRole('button', { name: 'Criar conta', exact: true }).click();
   await page.getByRole('button', { name: 'Explorar sem personalizar agora' }).click();
   await expect(page.getByRole('heading', { name: 'Início', exact: true })).toBeVisible();
   return email;
