@@ -12,7 +12,7 @@ import {
   DEFAULT_API, createCompanion, pairDevice, readConfig, setDiscordPresence, setPaused, unpairDevice,
 } from '../core.mjs';
 import { createIpcDiscordClient } from '../discord-client.mjs';
-import { createDiscordPresence, resolveDiscordSettings } from '../discord-presence.mjs';
+import { createDiscordPresence, normalizeStudy, resolveDiscordSettings } from '../discord-presence.mjs';
 import { checkForUpdate, downloadInstaller, RELEASES_PAGE } from '../update.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +30,36 @@ let state = {
   running: false, paused: false, paired: false, deviceName: '', apiUrl: '',
   detected: null, since: null, plan: null, error: null,
 };
+// Atividade enviada pela janela do Lume (aula, PDF, foco). A página renova a
+// cada poucos segundos; sem renovação (janela fechada, página recarregada ou
+// travada), o status volta ao roteiro.
+const STUDY_TTL_MS = 75_000;
+let study = null;
+let studyAt = 0;
+let studyTimer = null;
+
+function currentStudy() {
+  return study && Date.now() - studyAt < STUDY_TTL_MS ? study : null;
+}
+
+function syncDiscord() {
+  if (!discord) return Promise.resolve();
+  return discord.sync({ ...(companion?.getState() || state), study: currentStudy() }).catch(() => {});
+}
+
+function setStudy(value) {
+  const next = normalizeStudy(value);
+  const changed = JSON.stringify(next) !== JSON.stringify(study);
+  study = next;
+  studyAt = Date.now();
+  clearTimeout(studyTimer);
+  if (next) {
+    studyTimer = setTimeout(() => { syncDiscord(); }, STUDY_TTL_MS + 500);
+    if (typeof studyTimer.unref === 'function') studyTimer.unref();
+  }
+  if (changed) syncDiscord();
+}
+
 let discordStatus = { enabled: true, configured: false, status: 'unconfigured' };
 let updateInfo = {
   status: 'idle', currentVersion: '', latest: null, assetName: '', progress: 0, error: null, file: null, page: RELEASES_PAGE,
@@ -47,7 +77,7 @@ if (!app.requestSingleInstanceLock()) {
       onUpdate: (value) => {
         state = value;
         broadcast();
-        if (discord) discord.sync(state).catch(() => {});
+        syncDiscord();
       },
     });
     state = companion.getState();
@@ -105,7 +135,7 @@ if (!app.requestSingleInstanceLock()) {
     createMainWindow();
     mainWindow.once('ready-to-show', () => mainWindow.show());
     if (state.paired) await companion.start();
-    else if (discord) await discord.sync(state);
+    else if (discord) await syncDiscord();
   }).catch((error) => {
     console.error(`companion:startup-failed ${error?.stack || error}`);
     if (smoke) {
@@ -381,7 +411,7 @@ function showPanel() {
 async function toggleDiscord() {
   const enabled = readConfig().discordPresence !== false;
   setDiscordPresence(!enabled);
-  if (discord) await discord.sync(companion?.getState() || state);
+  if (discord) await syncDiscord();
   else discordStatus = discordGuess();
   broadcast();
   return snapshot();
@@ -394,7 +424,7 @@ async function togglePause() {
   else await companion.start();
   state = companion.getState();
   broadcast();
-  if (discord) discord.sync(state).catch(() => {});
+  syncDiscord();
   return state;
 }
 
@@ -405,6 +435,11 @@ async function disconnect() {
   broadcast();
   return state;
 }
+
+ipcMain.on('lume:study', (event, value) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  setStudy(value);
+});
 
 ipcMain.on('lume:theme', (_event, theme) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;

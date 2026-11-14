@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('lumeWindow', {
   setTheme(theme) {
     ipcRenderer.send('lume:theme', String(theme || 'dark'));
   },
+  // O que está sendo estudado (aula, PDF, foco) para o status do Discord.
+  // `null` limpa. A página só envia nomes que já mostra na tela.
+  setStudy(value) {
+    ipcRenderer.send('lume:study', value && typeof value === 'object' ? value : null);
+  },
   update: {
     check: () => ipcRenderer.invoke('lume:update', 'check'),
     download: () => ipcRenderer.invoke('lume:update', 'download'),

@@ -35,3 +35,12 @@ export function syncTitleBar(theme) {
     window.lumeWindow?.setTheme?.(theme === 'light' ? 'light' : 'dark');
   } catch { /* sem overlay, segue com a barra padrão. */ }
 }
+
+// Avisa o aplicativo do que está sendo estudado (aula, PDF, foco), para o
+// status do Discord. `null` limpa. No navegador não faz nada.
+export function reportStudy(activity) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.lumeWindow?.setStudy?.(activity || null);
+  } catch { /* sem ponte, o status segue pelo roteiro. */ }
+}
